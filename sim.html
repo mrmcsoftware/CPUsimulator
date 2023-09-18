@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>
+CPU Simulator by Mark Craig (youtube.com/MrMcSoftware) Copyright &copy; 2023
+</title>
+	<style>
+		body
+			{
+			background-color: black;
+			/* background:url("../../Desktop/waterf.jpg"); */ /* just playing */
+			color: white;
+			/* Uncomment transition line for gradual dark/light mode change */
+			/* transition: color 300ms, background-color 300ms; */
+			}
+		body.dark-mode
+			{
+			background-color: black;
+			color: white;
+			}
+		body.dark-mode a:link { color: #f0f000; }
+		body.dark-mode a:visited { color: #00ff00; }
+		body.dark-mode code { background-color: #404040; }
+		body.light-mode
+			{
+			background-color: #d0d0d0;
+			color: black;
+			}
+		body.light-mode a:link { color: #0000f0; }
+		body.light-mode a:visited { color: #a000a0; }
+		body.light-mode code { background-color: #ffffff; }
+		/* tab stops of 8 are a bit much for my tastes, adjust to your prefs. */
+		textarea, pre { -moz-tab-size: 4; -o-tab-size: 4; tab-size: 4; }
+		.modal
+			{
+			display: none;
+			position: fixed;
+			z-index: 1;
+			padding-top: 100px;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			overflow: auto;
+			background-color: rgb(0,0,0);
+			background-color: rgba(0,0,0,0.4);
+			}
+		.modal-content
+			{
+			position: relative;
+			background-color: #171717;
+			margin: auto;
+			padding: 0;
+			border: 2px solid #6797ff;
+			width: 40%;
+			box-shadow: 8px 8px 6px 5px rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+			}
+		.close
+			{
+			color: white;
+			float: right;
+			font-size: 18px;
+			font-weight: bold;
+			}
+		.close:hover,
+		.close:focus
+			{
+			color: #ff4040;
+			text-decoration: none;
+			cursor: pointer;
+			}
+		.modal-header
+			{
+			padding: 2px 16px;
+			background-color: #1022e4;
+			color: white;
+			font-size: 14px;
+			font-weight: bold;
+			}
+		.modal-body { padding: 2px 16px; color: white; font-size: 14px; }
+		/*
+		@font-face
+			{
+			font-family: "myfont";
+			font-style: normal;
+			font-weight: normal;
+			src: url("SudegnakNo4-Green-0fcf.woff") format('woff');
+			}
+		*/
+	</style>
+	<script src="contrib/audiosynth.js"></script>
+</head>
+<body>
+<!--font face="myfont" size="2">CPU Sim</font><br>
+<div style="font-family:myfont; font-size:100px">CPU Sim</div-->
+<button onclick="start()">Start</button>&nbsp;&nbsp;
+<button onclick="resetCPU()">Reset</button>&nbsp;&nbsp;
+<button id="pauseID" onclick="pauseResume()">&nbsp;&nbsp;Pause&nbsp;&nbsp;</button>&nbsp;&nbsp;
+<button onclick="runIt()">Step</button>&nbsp;&nbsp;
+<input id="speedID" type="text" value="1" maxlength="8" size=4 title="Speed (lower is faster (minimum is 0))" style="background-color:#d0d000; color:#000;" onchange="setSpeed()"/>&nbsp;&nbsp;
+<input id="extDevID" type="text" value="" maxlength="8" size=4 title="External Device input value (in hex)" style="background-color:#e0c000; color:#000;" onchange="setExtDev()"/>&nbsp;&nbsp;
+<select id="vidModeID" onchange="setVideoMode()">
+<option value="0" selected>256x256x24</option>
+<option value="1">128x128x16</option>
+<option value="2">256x256x16</option>
+<option value="3">320x240x24</option>
+</select>&nbsp;&nbsp;
+<select id="instrumentID" onchange="setInstrument()">
+<option value="piano" selected="selected">Piano</option>
+<option value="organ">Organ</option>
+<option value="acoustic">Acoustic Guitar</option>
+<option value="edm">EDM</option>
+</select>
+&nbsp;&nbsp;<button onclick="darkLightMode()" title="Darkmode/Lightmode Toggle"><div id="darkLightModeID">&#9788</div></button>&nbsp;&nbsp;&nbsp;
+<!--input type="checkbox" id="verboseID" onclick="setVerbose()" title="Toggle verbose output on console."> Verbose&nbsp;&nbsp;&nbsp;</input-->
+<input type="checkbox" id="showAssemID" onclick="setShowAssembler()" title="Toggle showing the Assembler"/> Assembler&nbsp;&nbsp;&nbsp;
+<input id="fileID" name="files" type="file"/>
+<br><br>
+<div style="float:left">
+<canvas id="canvas1" width=595 height=266></canvas>&nbsp;<br>
+<!--put wrap="off" in textarea for no word wrap-->
+<textarea id="ttyID" rows="13" cols="82" value="" onkeypress='ttyInput(event)' onkeydown='ttyInputSpecial(event)' readonly style="background-color:#000050; color:#fff;"></textarea>&nbsp;<br>
+<button onclick="clearTTY()">Clear TTY</button>&nbsp;&nbsp;
+<button onclick="setVideoMode()">Clear Video Screen</button>&nbsp;&nbsp;
+<button onclick="matrixDisplay()">Clear LED Matrix</button>&nbsp;&nbsp;
+</div>
+<div style="float:left">
+<textarea id="disassID" rows="31" cols="40" value="" readonly style="background-color: #000050; color:#fff; background:url(images/drag.png) center top no-repeat;"></textarea>&nbsp;<br>
+<button onclick="disassemble()">Disassemble</button>&nbsp;&nbsp;
+<button onclick="clearDisassembly()">Clear Disassembly</button>&nbsp;&nbsp;<br>
+<div id="instDivID" style="display:none"><textarea id="instID" rows="4" cols="40" value="" readonly style="background-color: #000050; color:#fff;"></textarea>&nbsp;</div>
+</div>
+<!--div style="float:left"-->
+<div>
+<input id="pcID" type="text" value="" maxlength="100" size=8 title="Program Counter (PC) Value" readonly style="background-color:#500000; color:#fff;">&nbsp;PC</input><br><br>
+<input id="irID" type="text" value="" maxlength="100" size=8 title="Instruction Register (IR) Value" readonly style="background-color:#005000; color:#fff;">&nbsp;IR</input><br><br>
+<input id="yID" type="text" value="" maxlength="100" size=8 title="Y Register Value" readonly style="background-color:#505000; color:#fff;">&nbsp;Y</input>
+<div id="yFdivID" style="display:none">
+<input id="yFID" type="text" value="" maxlength="100" size=18 title="Y Register Value (float)" readonly style="background-color:#505000; color:#fff;"/>
+</div>
+<br><br>
+<input id="aID" type="text" value="" maxlength="100" size=8 title="A Register Value" readonly style="background-color:#005050; color:#fff;">&nbsp;A</input>
+<div id="aFdivID" style="display:none">
+<input id="aFID" type="text" value="" maxlength="100" size=18 title="A Register Value (float)" readonly style="background-color:#005050; color:#fff;"/>
+</div>
+<br><br>
+<input id="clockID" type="text" value="" maxlength="100" size=15 title="Clock Value" readonly style="background-color:#500050; color:#fff;">&nbsp;Clock</input><br><br>
+<input id="kbID" type="text" value="" maxlength="100" size=15 title="Keyboard Buffer" readonly style="background-color:#000050; color:#fff;">&nbsp;KB</input><br><br>
+<input type="checkbox" id="showRegsID" onclick="setShowRegs()" title="Toggle showing register values"/> Show Above Regs<br>
+<input type="checkbox" id="showYID" onclick="setShowY()" title="Toggle graphically showing Y register" checked/> Show Y<br>
+<input type="checkbox" id="showAID" onclick="setShowA()" title="Toggle graphically showing A register" checked/> Show A<br>
+<input type="checkbox" id="instTTYID" onclick="setInstTTY()" title="Toggle showing instruction TTY"/> Instruction TTY<br>
+<input type="checkbox" id="noLagLEDMatID" onclick="setNoLagLEDMat()" title="Toggle No-Lag LED Matrix design"/> No Lag LED Matrix<br>
+<input type="checkbox" id="showYAFID" onclick="setShowYAF()" title="Toggle showing the float representation of the Y and A registers"/> Show Y and A as float<br>
+<input type="checkbox" id="breakpID" onclick="setProcBP()" title="Toggle breakpoint processing" checked/> Process breakpoints<br>
+<input type="checkbox" id="clockDisplayID" onclick="setClockDisplay()" title="Toggle clock display"/> Display Clock<br>
+<input type="checkbox" id="clock24ID" onclick="setClock24()" title="Toggle 24 hour clock"/> 24 Hour Clock<br>
+<input type="checkbox" id="clearTTYID" onclick="setAllowClearTTY()" title="Toggle allowing program to clear TTY screen." checked/> Allow TTY Clear<br>
+<input type="checkbox" id="fastModeID" onclick="setFastMode()" title="Toggle fast mode.  BE CAREFUL, keyboard input, etc. will not be available"/> Fast Mode (Be Careful)<br>
+</div>
+<div id="assemblerID" style="display:none">
+<br>
+<div style="float:left">
+<textarea id="assemID" rows="34" cols="82" value="" style="background-color:#000050; color:#fff;" spellcheck="false" wrap="off" onkeydown='assemInput(event)'></textarea>&nbsp;<br>
+<button onclick="runAssem()">Assemble</button>&nbsp;&nbsp;
+<button onclick="saveAssem()">Save As: </button>
+<input id="saveNameID" type="text" value="" maxlength="32" size=8 title="Filename to use for saving your assembly source code" style="background-color:#d0d000; color:#000;"/>&nbsp;&nbsp;&nbsp;
+<input id="assemFileID" name="files" type="file"/>
+</div>
+<div style="float:left">
+<textarea id="assemConsoleID" rows="34" cols="42" value="" style="background-color:#000050; color:#fff;" readonly></textarea>&nbsp;<br>
+<select id="assemVerboseID" onchange="setAssemVerbose()" title="Set how verbose level of assembly errors, warnings, information, and statistics">
+<option value="0">Just error messages</option>
+<option value="1" selected>Also general messages</option>
+<option value="2">Also parsed strings</option>
+<option value="3">Also final machine code</option>
+</select>&nbsp;&nbsp;
+</div>
+<div style="float:left">
+<button onclick="clearAssem()" title="Clear/Erase everything in the assembly source edit window" style="width:180px">Erase Assembly Source</button><br><br>
+<button onclick="saveBin()" title="Export/Save assembled machine code to a Logisim RAM file (which also can be loaded into this simulator)" style="width:180px">Save Machine Code As:</button><br>
+<input id="saveExportNameID" type="text" value="" maxlength="32" title="Filename to use for saving your assembled machine code" style="background-color:#e0c000; color:#000; width:174px"/><br><br>
+<form action="#" accept-charset=utf-8><button type="submit" title="Go to top of page (go to the simulator)" style="width:180px">Go To Top</button></form><br>
+</div>
+</div>
+<div id="ModalID" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<span id="modalHeaderID"></span>
+<span class="close">&times;</span>
+</div>
+<div id="modalBodyID" class="modal-body"></div>
+</div>
+</div>
+<img id="img0" src="images/cpusim.png" style="display:none">
+<img id="img1" src="images/cpusim2.png" style="display:none">
+<img id="img2" src="images/cpusim3.png" style="display:none">
+<img id="img3" src="images/cpusim4.png" style="display:none">
+<script>
+window.onload=function()
+{
+for (var vObj={},i=0,vArr=window.location.search.substring(1).split('&');i<vArr.length;v=vArr[i++].split('='),vObj[v[0]]=v[1]) { }
+if (vObj.dark==="false") { darkLightMode(); }
+if (vObj.assembler==="true") { document.querySelector('#showAssemID').checked=true; setShowAssembler(); }
+if (vObj.midimode==="off") { midiMode=0; }
+if (vObj.verbose==="on") { verb=true; }
+if (vObj.wordwrap==="off") { document.querySelector('#ttyID').wrap="off"; }
+if (typeof(vObj.image)!=='undefined') { img=parseInt(vObj.image); }
+drawPanel();
+}
+
+//const RAMSIZE=65536;
+//const RAMSIZE=16777216;
+const RAMSIZE=8388608;
+const tty=document.getElementById("ttyID");
+const disa=document.getElementById("disassID");
+const itty=document.getElementById("instID");
+const dyreg=document.getElementById("yID");
+const dareg=document.getElementById("aID");
+const dpcreg=document.getElementById("pcID");
+const dirreg=document.getElementById("irID");
+const dyfreg=document.getElementById("yFID");
+const dafreg=document.getElementById("aFID");
+const dclock=document.getElementById("clockID");
+const dkb=document.getElementById("kbID");
+// Assembler text areas
+const assem=document.getElementById("assemID");
+const acon=document.getElementById("assemConsoleID");
+
+var RAM=new Array(RAMSIZE);
+var LEDm=new Array(7);
+var instList=new Array(4);
+var Stack=new Array(256);
+var UStack=new Array(256);
+var Z,PC,IR;
+var SP=0,USP=0,breakp=1;
+var Y=0,A=0;
+var loaded=false;
+var vidMode=0;
+var vidW=vidH=256,vidX=0,vidY=0,showY=true,showA=true,showRegs=false;
+var noLagLEDMat=false,showYAF=false;
+var i,r,n,started=0;
+var halt=true,verb=false,nl=true,disass=false;
+var allowClearTTY=true,strobe=false,instTTY=false,ins=0;
+var colors=["#3050af"];
+var clock12=true,clockV=0,extDev=0;
+const midiNotes=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+var instrument=Synth.createInstrument('piano');
+var midiMode=1,darkMode=1,img=3;
+var interval=0,speed=1,fastMode=false,pause=false,clockD=false,fastIntr=0;
+var inputStr="";
+
+var canvas=document.getElementById('canvas1');
+//canvas.onclick=onclickfunc; // not needed at this point
+//document.onkeydown=keycontrol; // not needed at this point
+//document.onkeypress=ttyInput; // can't do this, causes problems
+var hdc=canvas.getContext("2d");
+//hdc.font="10px Helvetica"; // not needed at this point
+//hdc.font="100px myfont";
+drawPanel();
+
+function drawPanel()
+{
+hdc.fillStyle=colors[0];
+hdc.fillRect(0,0,595,266);
+hdc.fillStyle="#000000";
+hdc.fillRect(5,5,vidW,vidH);
+//hdc.fillText("CPU Sim",340,200);
+if (img>=0)
+	{
+	/*
+	var tmp=document.createElement("img");
+	tmp.style.display='none'
+	*/
+	var imgY;
+	var tmp=document.getElementById("img"+img.toString());
+	switch (img)
+		{
+		case 0: tmp.src="images/cpusim.png"; imgY=130; break;
+		case 1: tmp.src="images/cpusim2.png"; imgY=113; break;
+		case 2: tmp.src="images/cpusim3.png"; imgY=113; break;
+		case 3: tmp.src="images/cpusim4.png"; imgY=130; break;
+		}
+	//document.body.appendChild(tmp);
+	hdc.drawImage(tmp,336,imgY);
+	//document.body.removeChild(tmp);
+	}
+ledDisplay();
+matrixDisplay();
+cpuStatus();
+strobeStatus();
+}
+
+function matrixDisplay()
+{
+var y,i;
+
+hdc.fillStyle="#646464";
+hdc.lineWidth=1;
+hdc.strokeStyle="#000000";
+for (y=0;y<7;y++)
+	{
+	for (i=0;i<12;i++)
+		{
+		hdc.fillRect(332+i*8,50+y*8,8,8);
+		hdc.rect(332+i*8,50+y*8,8,8);
+		}
+	hdc.stroke();
+	}
+}
+
+function ledDisplay()
+{
+hdc.fillStyle="#646464";
+hdc.lineWidth=1;
+hdc.strokeStyle="#000000";
+for (i=0;i<32;i++)
+	{
+	hdc.fillRect(332+i*8,5,8,8);
+	hdc.rect(332+i*8,5,8,8);
+	hdc.fillRect(332+i*8,20,8,8);
+	hdc.rect(332+i*8,20,8,8);
+	}
+hdc.stroke();
+}
+
+function updateDisplay()
+{
+if (fastMode) { return; }
+if (showRegs)
+	{
+	dyreg.value=Y.toString(16);
+	dareg.value=A.toString(16);
+	dpcreg.value=PC.toString(16);
+	dirreg.value=IR.toString(16);
+	}
+if (showY)
+	{
+	for (i=0;i<32;i++)
+		{
+		if ((Y>>>(31-i))&0x00000001) { str="#ffff00"; } else { str="#646464"; }
+		hdc.fillStyle=str;
+		hdc.fillRect(333+i*8,6,6,6);
+		}
+	}
+if (showYAF)
+	{
+	dyfreg.value=IEEEToFloat(Y).toString();
+	dafreg.value=IEEEToFloat(A).toString();
+	}
+if (showA)
+	{
+	for (i=0;i<32;i++)
+		{
+		if ((A>>>(31-i))&0x00000001) { str="#00ffff"; } else { str="#646464"; }
+		hdc.fillStyle=str;
+		hdc.fillRect(333+i*8,21,6,6);
+		}
+	}
+if (clockD)
+	{
+	var str;
+	var hour=(Y&0x0000001f).toString();
+	hour="0".repeat((n=2-hour.length)>0?n:0)+hour;
+	var min=((Y>>>5)&0x0000003f).toString();
+	min="0".repeat((n=2-min.length)>0?n:0)+min;
+	var sec=((Y>>>11)&0x0000003f).toString();
+	sec="0".repeat((n=2-sec.length)>0?n:0)+sec;
+	str=hour+":"+min+":"+sec+(((Y>>>17)&0x00000001)?"pm":"am");
+	var mon=((Y>>>23)&0x0000000f).toString();
+	mon="0".repeat((n=2-mon.length)>0?n:0)+mon;
+	var day=((Y>>>27)&0x0000001f).toString();
+	day="0".repeat((n=2-day.length)>0?n:0)+day;
+	var year=((Y>>>18)&0x0000001f).toString();
+	year="0".repeat((n=2-year.length)>0?n:0)+year;
+	str+="   "+mon+"/"+day+"/"+year;
+	dclock.value=str;
+	}
+}
+
+function getInstruction(inst)
+{
+var str2="";
+var opcode,zregi;
+
+opcode=(inst)&0x000000ff;
+zregi=inst>>>8;
+var zreg="$"+zregi.toString(16)+" / "+zregi;
+if ((zregi<127)&&(zregi>=32)) { zreg+=" / "+String.fromCharCode(zregi); }
+switch (opcode)
+	{
+	case 0: str2="LOADI "+zreg; break;
+	case 1: str2="LOAD "+zreg; break;
+	case 2: str2="STOREI "+zreg; break;
+	case 3: str2="STORE "+zreg; break;
+	case 4: str2="ADDI "+zreg; break;
+	case 5: str2="ADD "+zreg; break;
+	case 6: str2="SUBI "+zreg; break;
+	case 7: str2="SUB "+zreg; break;
+	case 8: str2="JUMP "+zreg; break;
+	case 9: str2="JUMPI "+zreg; break;
+	case 10: str2="JUMPII "+zreg; break;
+	case 11: str2="DATAIN"; break;
+	case 12: str2="HALT"; break;
+	case 13: str2="SKIPNEG"; break;
+	case 14: str2="STROBE"; break;
+	case 15: str2="NOOP"; break;
+	case 16: str2="MULI "+zreg; break;
+	case 17: str2="MUL "+zreg; break;
+	case 18: str2="DIVI "+zreg; break;
+	case 19: str2="DIV "+zreg; break;
+	case 20: str2="MODI "+zreg; break;
+	case 21: str2="MOD "+zreg; break;
+	case 22: str2="LOADAI "+zreg; break;
+	case 23: str2="LOADA "+zreg; break;
+	case 24: str2="JUMPEQI "+zreg; break;
+	case 25: str2="JUMPGTI "+zreg; break;
+	case 26: str2="JUMPLTI "+zreg; break;
+	case 27: str2="JUMPNEQI "+zreg; break;
+	case 28: str2="JUMPGTEI "+zreg; break;
+	case 29: str2="JUMPLTEI "+zreg; break;
+	case 30: str2="NEGY"; break;
+	case 31: str2="STOREAI "+zreg; break;
+	case 32: str2="LOADAIND"; break;
+	case 33: str2="ANDI "+zreg; break;
+	case 34: str2="AND "+zreg; break;
+	case 35: str2="ORI "+zreg; break;
+	case 36: str2="OR "+zreg; break;
+	case 37: str2="NOT"; break;
+	case 38: str2="XORI "+zreg; break;
+	case 39: str2="XOR "+zreg; break;
+	case 40: str2="JUMPEQ "+zreg; break;
+	case 41: str2="JUMPGT "+zreg; break;
+	case 42: str2="JUMPLT "+zreg; break;
+	case 43: str2="JUMPNEQ "+zreg; break;
+	case 44: str2="JUMPGTE "+zreg; break;
+	case 45: str2="JUMPLTE "+zreg; break;
+	case 46: str2="STOREAIND"; break;
+	case 47: str2="FADDA"; break;
+	case 48: str2="FADD "+zreg; break;
+	case 49: str2="FSUBA"; break;
+	case 50: str2="FSUB "+zreg; break;
+	case 51: str2="FMULA"; break;
+	case 52: str2="FMUL "+zreg; break;
+	case 53: str2="FDIVA"; break;
+	case 54: str2="FDIV "+zreg; break;
+	case 55: str2="FMODA"; break;
+	case 56: str2="FMOD "+zreg; break;
+	case 57: str2="FNEGY"; break;
+	case 58: str2="FSQRTY"; break;
+	case 59: str2="FSQRT "+zreg; break;
+	case 60: str2="FSINY"; break;
+	case 61: str2="FSIN "+zreg; break;
+	case 62: str2="FCOSY"; break;
+	case 63: str2="FCOS "+zreg; break;
+	case 64: str2="FTANY"; break;
+	case 65: str2="FTAN "+zreg; break;
+	case 66: str2="FASINY"; break;
+	case 67: str2="FASIN "+zreg; break;
+	case 68: str2="FACOSY"; break;
+	case 69: str2="FACOS "+zreg; break;
+	case 70: str2="FATANY"; break;
+	case 71: str2="FATAN "+zreg; break;
+	case 72: str2="FATAN2A"; break;
+	case 73: str2="FATAN2 "+zreg; break;
+	case 74: str2="FPOWA"; break;
+	case 75: str2="FPOW "+zreg; break;
+	case 76: str2="FLNY"; break;
+	case 77: str2="FLN "+zreg; break;
+	case 78: str2="FLOGY"; break;
+	case 79: str2="FLOG "+zreg; break;
+	case 80: str2="FABSY"; break;
+	case 81: str2="FABS "+zreg; break;
+	case 82: str2="FEXPY"; break;
+	case 83: str2="FEXP "+zreg; break;
+	case 84: str2="FPTOINTY"; break;
+	case 85: str2="FPTOINT "+zreg; break;
+	case 86: str2="INTTOFPY"; break;
+	case 87: str2="INTTOFP "+zreg; break;
+	case 88: str2="FJUMPEQI "+zreg; break;
+	case 89: str2="FJUMPGTI "+zreg; break;
+	case 90: str2="FJUMPLTI "+zreg; break;
+	case 91: str2="FJUMPNEQI "+zreg; break;
+	case 92: str2="FJUMPGTEI "+zreg; break;
+	case 93: str2="FJUMPLTEI "+zreg; break;
+	case 94: str2="FJUMPEQ "+zreg; break;
+	case 95: str2="FJUMPGT "+zreg; break;
+	case 96: str2="FJUMPLT "+zreg; break;
+	case 97: str2="FJUMPNEQ "+zreg; break;
+	case 98: str2="FJUMPGTE "+zreg; break;
+	case 99: str2="FJUMPLTE "+zreg; break;
+	case 100: str2="CALL "+zreg; break;
+	case 101: str2="RETURN"; break;
+	case 102: str2="PUSH"; break;
+	case 103: str2="POP"; break;
+	case 104: str2="SREAD "+zreg; break;
+	case 253: str2="FASTINTR"; break;
+	case 254: str2="BREAKPOINTS "+zreg; break;
+	case 255: str2="BREAKPOINT "+zreg; break;
+	default: str2="** Unknown ** "+opcode+" "+zreg; break;
+	}
+return(str2);
+}
+
+// process Logisim (RAM contents) bin file
+
+function processBin(bin)
+{
+console.log("Processing program");
+var hasStar,val;
+var n=0;
+var j;
+r=0;
+n=bin.indexOf("\n")+1;
+var l=bin.length;
+while (n<l)
+	{
+	var ns=n;
+	while ((bin.charAt(n)!==' ')&&(bin.charAt(n)!=='\n')&&(n<l)) { n++; }
+	var str=bin.substring(ns,n);
+	if (bin.charCodeAt(n)===32) { n++; }
+	if (bin.charCodeAt(n)===13) { n++; }
+	if (bin.charCodeAt(n)===10) { n++; }
+	//if (n>l) break;
+	hasStar=0;
+	for (i=0;i<str.length;i++)
+		{
+		if (str.charAt(i)==='*')
+			{
+			j=parseInt(str.substring(0,i));
+			val=parseInt(str.substring(i+1),16);
+			hasStar=1;
+			break;
+			}
+		}
+	if (hasStar) { for (i=0;i<j;i++) { RAM[r+i]=val; } r+=j; }
+	else { RAM[r]=parseInt(str,16); r++; }
+	if (r>=RAMSIZE) { myAlert("<br>Program too big<br><br>","Error"); break; }
+	}
+if (r<RAMSIZE) { RAM[r]=12; r++; } // halt in case the program didn't have halt
+console.log("done");
+//for (i=0;i<r;i++) { console.log(i+": "+RAM[i]); }
+resetCPU();
+}
+
+function disassemble()
+{
+disa.value="";
+for (i=0;i<r;i++)
+	{
+	var addr=i.toString(16);
+	addr=" ".repeat((n=5-addr.length)>0?n:0)+addr;
+	disa.value+=addr+"  "+getInstruction(RAM[i])+"\n";
+	//console.log(addr+"  "+getInstruction(RAM[i]));
+	//console.log(i.toString(16).padStart(5,' ')+"  "+getInstruction(RAM[i]));
+	}
+bkgndSet();
+}
+
+function drawCircle(hdc,x,y,radius,fill,stroke,strokeWidth)
+{
+hdc.beginPath();
+hdc.arc(x,y,radius,0,2*Math.PI,false);
+if (fill) { hdc.fillStyle=fill; hdc.fill(); }
+if (stroke) { hdc.lineWidth=strokeWidth; hdc.strokeStyle=stroke; hdc.stroke(); }
+}
+
+function cpuStatus()
+{
+if (halt) { drawCircle(hdc,540,90,10,"#ff0000","#000000",3); }
+else { drawCircle(hdc,540,90,10,"#00ff00","#000000",3); }
+}
+
+function strobeStatus()
+{
+if (strobe) { drawCircle(hdc,540,60,10,"#ffff00","#000000",3); }
+else { drawCircle(hdc,540,60,10,"#606000","#000000",3); }
+}
+
+function fmod(o1,o2)
+{
+return(Number((o1-(Math.floor(o1/o2)*o2)).toPrecision(8)));
+}
+
+function start()
+{
+if (!loaded) { myAlert("<br>Load or assemble a program first<br><br>","Error",0); return; }
+console.log("Running");
+PC=0;
+halt=false;
+cpuStatus();
+started=1;
+clockV=0;
+tty.focus();
+if ((!pause)&&(interval===0)) { interval=setInterval(runIt,speed); }
+}
+
+function runIt()
+{
+var o1,o2,p;
+var noPC=0;
+var opcode;
+
+if (halt) { return; }
+if (strobe) { strobe=false; strobeStatus(); }
+if (PC>=RAMSIZE) { myAlert("<br>For some reason, PC is out of bounds<br><br>","Error"); return; }
+IR=RAM[PC];
+if ((instTTY)&&(!fastMode))
+	{
+	instList[ins]=getInstruction(IR);
+	str="";
+	i=ins-3; if (i<0) { i+=4; } str+=instList[i]+"\n";
+	i=ins-2; if (i<0) { i+=4; } str+=instList[i]+"\n";
+	i=ins-1; if (i<0) { i+=4; } str+=instList[i]+"\n";
+	str+=instList[ins];
+	itty.value=str;
+	ins++; if (ins>3) { ins=0; }
+	}
+opcode=IR&0x000000ff;
+Z=IR>>>8;
+if (verb) { console.log("PC="+PC+" IR="+IR.toString(16)+" opcode="+opcode.toString(16)+" Z="+Z.toString(16)+" Y="+Y.toString(16)+" A="+A.toString(16)); }
+switch (opcode)
+	{
+	case 0: Y=Z; break;
+	case 1: Y=RAM[Z]; break;
+	case 31:
+	case 2:
+		if (opcode===31) { p=A; } else { p=Y; }
+		if (Z>=0x800000)
+			{
+			switch (Z)
+				{
+				case 0x800000:
+					if (p&0x800000)
+						{
+						if (allowClearTTY) { tty.value=""; }
+						else { tty.value+="\n"; tty.scrollTop=tty.scrollHeight; }
+						break;
+						}
+					if ((p===13)&&(nl)) { tty.value+="\n"; /* console.log("\n"); */ tty.scrollTop=tty.scrollHeight; }
+					else { tty.value+=String.fromCharCode(p&0x0000007f); /* console.log(String.fromCharCode(p&0x0000007f)); */ }
+					break;
+				case 0x800001: /* console.log("Video pos: "+p); */
+					switch (vidMode)
+						{
+						case 0: vidX=(p&0x000000ff); vidY=((p>>>8)&0x000000ff); break;
+						case 1: vidX=(p&0x0000007f); vidY=((p>>>7)&0x0000007f); break;
+						case 2: vidX=(p&0x000000ff); vidY=((p>>>8)&0x000000ff); break;
+						case 3: if (p===1) { vidX=vidY=0; } break;
+						}
+					break;
+				case 0x800002: /* console.log("Video setpixel: "+p); */
+					var str;
+					if (p&0x80000000)
+						{
+						vidX=vidY=0;
+						str="#000000";
+						hdc.strokeStyle=str;
+						hdc.fillStyle=str;
+						hdc.fillRect(5,5,vidW,vidH);
+						break;
+						}
+					switch (vidMode)
+						{
+						case 0: 
+							//str="#"+((p>>>16)&0x000000ff).toString(16)+((p>>>8)&0x000000ff).toString(16)+(p&0x000000ff).toString(16);
+							str="rgb("+((p>>>16)&0x000000ff).toString()+","+((p>>>8)&0x000000ff).toString()+","+(p&0x000000ff).toString()+")";
+							/*
+							red=((p>>>16)&0x000000ff).toString(16);
+							green=((p>>>8)&0x000000ff).toString(16);
+							blue=(p&0x000000ff).toString(16);
+							red="0".repeat((n=2-red.length)>0?n:0)+red;
+							green="0".repeat((n=2-green.length)>0?n:0)+green;
+							blue="0".repeat((n=2-blue.length)>0?n:0)+blue;
+							str="#"+red+green+blue;
+							*/
+							//hdc.strokeStyle=str;
+							hdc.fillStyle=str;
+							hdc.fillRect(vidX+5,vidY+5,1,1);
+							break;
+						case 1:
+							//str="#"+(((p>>>10)&0x0000001f)<<3).toString(16)+(((p>>>5)&0x0000001f)<<3).toString(16)+((p&0x0000001f)<<3).toString(16);
+							str="rgb("+(((p>>>10)&0x0000001f)<<3).toString()+","+(((p>>>5)&0x0000001f)<<3).toString()+","+((p&0x0000001f)<<3).toString()+")";
+							//hdc.strokeStyle=str;
+							hdc.fillStyle=str;
+							hdc.fillRect(vidX*2+5,vidY*2+5,2,2);
+							//disa.value+="c: "+vidX+","+vidY+": "+str+"\n";
+							break;
+						case 2:
+							//str="#"+(((p>>>10)&0x0000001f)<<3).toString(16)+(((p>>>5)&0x0000001f)<<3).toString(16)+((p&0x0000001f)<<3).toString(16);
+							str="rgb("+(((p>>>10)&0x0000001f)<<3).toString()+","+(((p>>>5)&0x0000001f)<<3).toString()+","+((p&0x0000001f)<<3).toString()+")";
+							//hdc.strokeStyle=str;
+							hdc.fillStyle=str;
+							hdc.fillRect(vidX+5,vidY+5,1,1);
+							break;
+						case 3: 
+							//str="#"+((p>>>16)&0x000000ff).toString(16)+((p>>>8)&0x000000ff).toString(16)+(p&0x000000ff).toString(16);
+							str="rgb("+((p>>>16)&0x000000ff).toString()+","+((p>>>8)&0x000000ff).toString()+","+(p&0x000000ff).toString()+")";
+							//hdc.strokeStyle=str;
+							hdc.fillStyle=str;
+							hdc.fillRect(vidX+5,vidY+5,1,1);
+							vidX++; if (vidX>319) { vidX=0; vidY++; } break;
+						}
+					break;
+				case 0x800003: if (inputStr.length) { inputStr=inputStr.substring(1); } dkb.value=inputStr; /* console.log("keyboard consume"); */ break;
+				case 0x800004: /* console.log("sound freq: "+p); */
+					if (midiMode)
+						{
+						if (p<128) { instrument.play(midiNotes[p%12],Math.trunc(p/12)-1,2); }
+						}
+					else { p=Math.trunc((12.0*Math.log(p/220.0)/Math.log(2.0))+57.01); instrument.play(midiNotes[p%12],Math.trunc(p/12)-1,2); }
+					break;
+				case 0x800005: Synth.setVolume(p/127.0); break;
+				case 0x800006:
+					var r,i,y;
+					if (noLagLEDMat)
+						{
+						if (p&0x00080000)
+							{
+							LEDm[(p>>>16)&0x00000007]=p;
+							for (r=0;r<7;r++)
+								{
+								y=r*8;
+								for (i=0;i<12;i++)
+									{
+									if ((LEDm[r]>>>(11-i))&0x00000001) { str="#00ff00"; } else { str="#646464"; }
+									hdc.fillStyle=str;
+									hdc.fillRect(333+i*8,51+y,6,6);
+									}
+								}
+							}
+						else { LEDm[(p>>>16)]=p; }
+						}
+					else
+						{
+						y=(p>>>16)*8;
+						if ((p>>>16)>6) { break; } // must be no lag version
+						for (i=0;i<12;i++)
+							{
+							if ((p>>>(11-i))&0x00000001) { str="#00ff00"; } else { str="#646464"; }
+							hdc.fillStyle=str;
+							hdc.fillRect(333+i*8,51+y,6,6);
+							}
+						}
+					/*
+					var bval=(p&0x00000fff).toString(2);
+					bval="0".repeat((n=12-bval.length)>0?n:0)+bval;
+					console.log("LED matrix: row: "+(p>>>16).toString()+" "+bval);
+					*/
+					break;
+				case 0x800007: /* console.log("time"); */
+					if (p&0x800000) { clockV=0; }
+					else
+						{
+						var current=new Date(),hours;
+						i=0;
+						if ((hours=current.getHours())>=12) { i=1; }
+						if (clock12)
+							{
+							if (hours>12) { hours-=12; }
+							else if (hours===0) { hours=12; }
+							}
+						clockV=hours|(current.getMinutes()<<5)|
+							(current.getSeconds()<<11)|(i<<17)|
+							((current.getFullYear()-2000)<<18)|
+							((current.getMonth()+1)<<23)|(current.getDate()<<27);
+						}
+					break;
+				}
+			}
+		else { RAM[Z]=p; }
+		break;
+	case 3: console.log("STORE not implemented\n"); break;
+	case 4: Y+=Z; break;
+	case 5: Y+=RAM[Z]; break;
+	case 6: Y-=Z; break;
+	case 7: Y-=RAM[Z]; break;
+	case 8: PC=Z; noPC=1; break;
+	case 9: PC=RAM[Z]; noPC=1; break;
+	case 10: console.log("JUMPII not implemented\n"); break;
+	case 11: if (fastMode) { turnOffFastMode(); } Y=extDev|clockV;
+		if (inputStr.length) { Y|=(inputStr.charCodeAt(0)+256); }
+		/* tty.focus(); */ clockV=0;
+		break;
+	case 12: halt=true; cpuStatus(); break;
+	case 13: if (Y&0x80000000) { PC++; } break;
+	case 14: strobe=true; /* console.log("Strobe\n");*/ strobeStatus(); break;
+	case 15: break;
+	case 16: Y*=Z; break;
+	case 17: Y*=RAM[Z]; break;
+	case 18: Y=Math.trunc(Y/Z); break;
+	case 19: Y=Math.trunc(Y/RAM[Z]); break;
+	case 20: Y%=Z; break;
+	case 21: Y%=RAM[Z]; break;
+	case 22: A=Z; break;
+	case 23: A=RAM[Z]; break;
+	case 24: if (Y===A) { PC=Z; noPC=1; } break;
+	case 25: if (Y>A) { PC=Z; noPC=1; } break;
+	case 26: if (Y<A) { PC=Z; noPC=1; } break;
+	case 27: if (Y!==A) { PC=Z; noPC=1; } break;
+	case 28: if (Y>=A) { PC=Z; noPC=1; } break;
+	case 29: if (Y<=A) { PC=Z; noPC=1; } break;
+	case 30: Y=-Y; break;
+	case 32: if (Y<RAMSIZE) { A=RAM[Y]; } else { console.log("RAM: out of bounds"); } break;
+	case 33: Y&=Z; break;
+	case 34: Y&=RAM[Z]; break;
+	case 35: Y|=Z; break;
+	case 36: Y|=RAM[Z]; break;
+	case 37: Y=~Y; break;
+	case 38: Y^=Z; break;
+	case 39: Y^=RAM[Z]; break;
+	case 40: if (Y===A) { PC=RAM[Z]; noPC=1; } break;
+	case 41: if (Y>A) { PC=RAM[Z]; noPC=1; } break;
+	case 42: if (Y<A) { PC=RAM[Z]; noPC=1; } break;
+	case 43: if (Y!==A) { PC=RAM[Z]; noPC=1; } break;
+	case 44: if (Y>=A) { PC=RAM[Z]; noPC=1; } break;
+	case 45: if (Y<=A) { PC=RAM[Z]; noPC=1; } break;
+	case 46: if (Y>=RAMSIZE) { console.log("STOREAIND: Y out of bounds due to ramsize"); } else { RAM[Y]=A; } break;
+	case 47: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1+=o2; Y=FloatToIEEE(o1); break;
+	case 48: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1+=o2; Y=FloatToIEEE(o1); break;
+	case 49: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1-=o2; Y=FloatToIEEE(o1); break;
+	case 50: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1-=o2; Y=FloatToIEEE(o1); break;
+	case 51: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1*=o2; Y=FloatToIEEE(o1); break;
+	case 52: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1*=o2; Y=FloatToIEEE(o1); break;
+	case 53: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1/=o2; Y=FloatToIEEE(o1); break;
+	case 54: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1/=o2; Y=FloatToIEEE(o1); break;
+	case 55: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1=fmod(o1,o2); Y=FloatToIEEE(o1); break;
+	case 56: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1=fmod(o1,o2); Y=FloatToIEEE(o1); break;
+	case 57: o1=IEEEToFloat(Y); o1=-o1; Y=FloatToIEEE(o1); break;
+	case 58: o1=IEEEToFloat(Y); o1=Math.sqrt(o1); Y=FloatToIEEE(o1); break;
+	case 59: o1=IEEEToFloat(RAM[Z]); o1=Math.sqrt(o1); Y=FloatToIEEE(o1); break;
+	case 60: o1=IEEEToFloat(Y); o1=Math.sin(o1); Y=FloatToIEEE(o1); break;
+	case 61: o1=IEEEToFloat(RAM[Z]); o1=Math.sin(o1); Y=FloatToIEEE(o1); break;
+	case 62: o1=IEEEToFloat(Y); o1=Math.cos(o1); Y=FloatToIEEE(o1); break;
+	case 63: o1=IEEEToFloat(RAM[Z]); o1=Math.cos(o1); Y=FloatToIEEE(o1); break;
+	case 64: o1=IEEEToFloat(Y); o1=Math.tan(o1); Y=FloatToIEEE(o1); break;
+	case 65: o1=IEEEToFloat(RAM[Z]); o1=Math.tan(o1); Y=FloatToIEEE(o1); break;
+	case 66: o1=IEEEToFloat(Y); o1=Math.asin(o1); Y=FloatToIEEE(o1); break;
+	case 67: o1=IEEEToFloat(RAM[Z]); o1=Math.asin(o1); Y=FloatToIEEE(o1); break;
+	case 68: o1=IEEEToFloat(Y); o1=Math.acos(o1); Y=FloatToIEEE(o1); break;
+	case 69: o1=IEEEToFloat(RAM[Z]); o1=Math.acos(o1); Y=FloatToIEEE(o1); break;
+	case 70: o1=IEEEToFloat(Y); o1=Math.atan(o1); Y=FloatToIEEE(o1); break;
+	case 71: o1=IEEEToFloat(RAM[Z]); o1=Math.atan(o1); Y=FloatToIEEE(o1); break;
+	case 72: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1=Math.atan2(o1,o2); Y=FloatToIEEE(o1); break;
+	case 73: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1=Math.atan2(o1,o2); Y=FloatToIEEE(o1); break;
+	case 74: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); o1=Math.pow(o1,o2); Y=FloatToIEEE(o1); break;
+	case 75: o1=IEEEToFloat(Y); o2=IEEEToFloat(RAM[Z]); o1=Math.pow(o1,o2); Y=FloatToIEEE(o1); break;
+	case 76: o1=IEEEToFloat(Y); o1=Math.log(o1); Y=FloatToIEEE(o1); break;
+	case 77: o1=IEEEToFloat(RAM[Z]); o1=Math.log(o1); Y=FloatToIEEE(o1); break;
+	case 78: o1=IEEEToFloat(Y); o1=Math.log10(o1); Y=FloatToIEEE(o1); break;
+	case 79: o1=IEEEToFloat(RAM[Z]); o1=Math.log10(o1); Y=FloatToIEEE(o1); break;
+	case 80: o1=IEEEToFloat(Y); o1=Math.abs(o1); Y=FloatToIEEE(o1); break;
+	case 81: o1=IEEEToFloat(RAM[Z]); o1=Math.abs(o1); Y=FloatToIEEE(o1); break;
+	case 82: o1=IEEEToFloat(Y); o1=Math.exp(o1); Y=FloatToIEEE(o1); break;
+	case 83: o1=IEEEToFloat(RAM[Z]); o1=Math.exp(o1); Y=FloatToIEEE(o1); break;
+	case 84: o1=IEEEToFloat(Y); Y=Math.trunc(o1); break;
+	case 85: o1=IEEEToFloat(RAM[Z]); Y=Math.trunc(o1); break;
+	case 86: o1=Y; Y=FloatToIEEE(o1); break; // MARK?
+	case 87: o1=RAM[Z]; Y=FloatToIEEE(o1); break; // MARK?
+	case 88: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1===o2) { PC=Z; noPC=1; } break;
+	case 89: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1>o2) { PC=Z; noPC=1; } break;
+	case 90: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1<o2) { PC=Z; noPC=1; } break;
+	case 91: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1!=o2) { PC=Z; noPC=1; } break;
+	case 92: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1>=o2) { PC=Z; noPC=1; } break;
+	case 93: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1<=o2) { PC=Z; noPC=1; } break;
+	case 94: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1===o2) { PC=RAM[Z]; noPC=1; } break;
+	case 95: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1>o2) { PC=RAM[Z]; noPC=1; } break;
+	case 96: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1<o2) { PC=RAM[Z]; noPC=1; } break;
+	case 97: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1!=o2) { PC=RAM[Z]; noPC=1; } break;
+	case 98: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1>=o2) { PC=RAM[Z]; noPC=1; } break;
+	case 99: o1=IEEEToFloat(Y); o2=IEEEToFloat(A); if (o1<=o2) { PC=RAM[Z]; noPC=1; } break;
+	case 100: Stack[SP]=PC+1; SP--; if (SP<0) { SP=255; } PC=Z; noPC=1; break;
+	case 101: SP++; if (SP>255) { SP=0; } PC=Stack[SP]; noPC=1; break;
+	case 102: UStack[USP]=Y; USP--; if (USP<0) { USP=255; } break;
+	case 103: USP++; if (USP>255) { USP=0; } Y=UStack[USP]; break;
+	case 104: i=USP+(Z&0x000000ff); if (i>255) { i-=256; } Y=UStack[i]; break; 
+	case 253: if (fastMode) { fastIntr=1; fastMode=false; interval=setInterval(setFastMode,speed); } break;
+	case 254:
+		if (breakp)
+			{
+			var forcedPause=0;
+			if (!pause) { pauseResume(); forcedPause=1; }
+			i=0;
+			var str="<br>";
+			while (i<1024) { str+=String.fromCharCode(RAM[Z+i]); if (RAM[Z+i]===0) { break; } i++; }
+			str+="<br><br>";
+			myAlert(str,"Breakpoint",forcedPause);
+			}
+		break;
+	case 255: 
+		if (breakp)
+			{
+			var forcedPause=0;
+			if (!pause) { pauseResume(); forcedPause=1; }
+			if (Z===0xffffff) { o1=IEEEToFloat(Y); myAlert("<br>Y = $"+Y.toString(16)+" ("+Y+") ("+o1+")<br><br>","Breakpoint",forcedPause); }
+			else if (Z===0xfffffe) { o1=IEEEToFloat(A); myAlert("<br>A = $"+A.toString(16)+" ("+A+") ("+o1+")<br><br>","Breakpoint",forcedPause); }
+			else { o1=IEEEToFloat(RAM[Z]); myAlert("<br>$"+Z.toString(16)+" ("+Z+") = $"+RAM[Z].toString(16)+" ("+RAM[Z]+") ("+o1+")<br><br>","Breakpoint",forcedPause); }
+			}
+		break;
+	default: console.log("Unknown opcode: "+opcode+" ("+IR+")"); break;
+	}
+if (!noPC) { PC++; }
+else { noPC=0; }
+updateDisplay();
+if (halt) { if (verb) { console.log("Halted\n"); } if (interval>0) { clearInterval(interval); interval=0; } started=0; }
+}
+
+function runContinuous()
+{
+while ((!halt)&&(fastMode)) { runIt(); }
+}
+
+function pauseResume()
+{
+var btn=document.getElementById("pauseID");
+if (!pause)
+	{
+	if (interval>0) { clearInterval(interval); interval=0; }
+	btn.innerHTML="Resume";
+	}
+else
+	{
+	if ((started)&&(interval===0)) { interval=setInterval(runIt,speed); }
+	btn.innerHTML="&nbsp;&nbsp;Pause&nbsp;&nbsp;";
+	}
+pause=!pause;
+}
+
+function ttyInputSpecial(event)
+{
+var keyb=event.keyCode;
+if (keyb===0) { keyb=event.charCode; }
+if ((event.shiftKey)&&(event.ctrlKey)) { if (!fastMode) { document.querySelector('#fastModeID').checked=true; setFastMode(); } return; } // Ctrl-Shift for Fast Mode
+if (keyb===8) { i=inputStr.length; if (i>0) { inputStr=inputStr.substring(0,i-1); dkb.value=inputStr; } } // 8 is backspace
+}
+
+function ttyInput(event)
+{
+var keyb=event.keyCode;
+if (keyb===0) { keyb=event.charCode; }
+if (keyb!==8) { inputStr+=String.fromCharCode(keyb); dkb.value=inputStr; }
+}
+
+function clearTTY()
+{
+tty.value="";
+}
+
+function clearDisassembly()
+{
+disa.value="";
+bkgndSet();
+}
+
+function setVerbose()
+{
+verb=(document.querySelector('#verboseID').checked);
+}
+
+function setAllowClearTTY()
+{
+allowClearTTY=(document.querySelector('#clearTTYID').checked);
+}
+
+function turnOffFastMode()
+{
+fastMode=false;
+document.querySelector('#fastModeID').checked=false;
+interval=setInterval(runIt,speed);
+}
+
+function setFastMode()
+{
+fastIntr=0;
+fastMode=(document.querySelector('#fastModeID').checked);
+if (fastMode)
+	{
+	if (interval>0) { clearInterval(interval); interval=0; }
+	// don't need to turn off A display, etc. because not done in updateDisplay
+	//if (showA) { document.querySelector('#showAID').checked=false; showA=false; }
+	if ((loaded)&&(!halt)) { runContinuous(); }
+	}
+}
+
+function resetCPU()
+{
+halt=true;
+strobe=false;
+started=0;
+if (pause) { pauseResume(); }
+inputStr="";
+dkb.value="";
+PC=IR=Y=A=vidX=vidY=LEDm[0]=LEDm[1]=LEDm[2]=LEDm[3]=LEDm[4]=LEDm[5]=LEDm[6]=0;
+SP=USP=0;
+ledDisplay();
+cpuStatus();
+strobeStatus();
+hdc.fillStyle="#000000";
+hdc.fillRect(5,5,vidW,vidH);
+clearTTY();
+updateDisplay();
+instList[0]=instList[1]=instList[2]=instList[3]=""; ins=0; itty.value="";
+}
+
+function setVideoMode()
+{
+vidMode=parseInt(document.getElementById("vidModeID").value);
+//console.log(vidMode);
+switch (vidMode)
+	{
+	case 0:
+	case 1:
+	case 2: vidW=vidH=256; break;
+	case 3: vidW=320; vidH=240; break;
+	}
+hdc.fillStyle=colors[0];
+hdc.fillRect(0,0,326,266);
+hdc.fillStyle="#000000";
+hdc.fillRect(5,5,vidW,vidH);
+}
+
+function setInstrument()
+{
+instrument=Synth.createInstrument(document.getElementById("instrumentID").value);
+}
+
+function setSpeed()
+{
+speed=parseInt(document.querySelector("#speedID").value);
+if (interval>0) { clearInterval(interval); interval=setInterval(runIt,speed); }
+}
+
+function setExtDev()
+{
+extDev=parseInt(document.querySelector("#extDevID").value,16);
+}
+
+function setShowY()
+{
+showY=(document.querySelector('#showYID').checked);
+}
+
+function setShowA()
+{
+showA=(document.querySelector('#showAID').checked);
+}
+
+function setShowYAF()
+{
+showYAF=(document.querySelector('#showYAFID').checked);
+if (showYAF)
+	{
+	document.getElementById("yFdivID").style="display:inline";
+	document.getElementById("aFdivID").style="display:inline";
+	}
+else
+	{
+	document.getElementById("yFdivID").style="display:none";
+	document.getElementById("aFdivID").style="display:none";
+	}
+}
+
+function setShowRegs()
+{
+showRegs=(document.querySelector('#showRegsID').checked);
+}
+
+function setInstTTY()
+{
+instTTY=(document.querySelector('#instTTYID').checked);
+if (instTTY)
+	{
+	document.getElementById("disassID").rows=24;
+	document.getElementById("instDivID").style="display:inline";
+	}
+else
+	{
+	document.getElementById("disassID").rows=31;
+	document.getElementById("instDivID").style="display:none";
+	}
+}
+
+function setNoLagLEDMat()
+{
+noLagLEDMat=(document.querySelector('#noLagLEDMatID').checked);
+}
+
+function setProcBP()
+{
+breakp=(document.querySelector('#breakpID').checked);
+}
+
+function setClockDisplay()
+{
+clockD=(document.querySelector('#clockDisplayID').checked);
+}
+
+function setClock24()
+{
+clock12=!(document.querySelector('#clock24ID').checked);
+}
+
+function myAlert(msg,title,breakp)
+{
+var modal=document.getElementById("ModalID");
+var span=document.getElementsByClassName("close")[0];
+var modalBody=document.getElementById("modalBodyID");
+var modalHeader=document.getElementById("modalHeaderID");
+modalBody.innerHTML=msg;
+modalHeader.innerHTML=title;
+modal.style.display="block";
+span.onclick=function() { modal.style.display="none"; if (breakp) { pauseResume(); } }
+}
+
+function bkgndSet()
+{
+if (darkMode)
+	{
+	if (disa.value!=="") { disa.style="background-color:#000050; color:#fff;"; }
+	else { disa.style="background-color:#000050; color:#fff; background:url(images/drag.png) center top no-repeat;"; }
+	}
+else
+	{
+	if (disa.value!=="") { disa.style="background-color:#efefef; color:#000;"; }
+	else { disa.style="background-color:#efefef; color:#000; background:url(images/drag.png) center top no-repeat;"; }
+	}
+}
+
+function darkLightMode()
+{
+var btn=document.getElementById("darkLightModeID");
+var c=document.body.className;
+// Toggle modes based on what the button currently is
+if ((c==="dark-mode")||(c===""))
+	{
+	document.body.className="light-mode"; btn.innerHTML="&#9789";
+	colors=["#90a9ff"];
+	tty.style="background-color:#efefef; color:#000000;";
+	itty.style="background-color:#efefef; color:#000000;";
+	assem.style="background-color:#efefef; color:#000000;";
+	acon.style="background-color:#efefef; color:#000000;";
+	darkMode=0;
+	}
+else
+	{
+	document.body.className="dark-mode"; btn.innerHTML="&#9788";
+	colors=["#3050af"];
+	tty.style="background-color:#000050; color:#fff;";
+	itty.style="background-color:#000050; color:#fff;";
+	assem.style="background-color:#000050; color:#fff;";
+	acon.style="background-color:#000050; color:#fff;";
+	darkMode=1;
+	}
+bkgndSet();
+drawPanel();
+}
+
+function FloatToIEEE(f)
+{
+var buf=new ArrayBuffer(4);
+(new Float32Array(buf))[0]=f;
+return((new Uint32Array(buf))[0]);
+}
+
+function IEEEToFloat(f)
+{
+var buf=new ArrayBuffer(4);
+(new Uint32Array(buf))[0]=f;
+return((new Float32Array(buf))[0]);
+}
+
+document.getElementById("fileID").onchange=function(event)
+	{
+	if (!window.FileReader) { return; } // Browser is not compatible
+	var reader=new FileReader();
+	reader.onload=function(event)
+		{
+		if (event.target.readyState!=2) { return; }
+		if (event.target.error) { alert('Error while reading file'); return; }
+		processBin(event.target.result);
+		loaded=true;
+		started=0;
+		};
+	reader.readAsText(event.target.files[0]);
+	};
+
+/*
+
+The Assembler
+
+*/
+
+var pos=0,len,pass=0;
+var equs={};
+var labels={};
+var addr=0,out=1,out2=0,v,dnl=1,verba=1;
+var sourceName="untitled.asm";
+var binName="untitled.bin";
+
+function setAssemVerbose()
+{
+verba=parseInt(document.getElementById("assemVerboseID").value);
+}
+
+// won't work in some browsers
+function assemInput(event)
+{
+if (event.keyCode===9)
+	{
+	var startPos=assem.selectionStart;
+	var endPos=assem.selectionEnd;
+	assem.value=assem.value.substring(0,startPos)+"\t"+assem.value.substring(endPos);
+	assem.selectionStart=assem.selectionEnd=startPos+1;
+	if (event.preventDefault) { event.preventDefault(); }
+	else { event.returnValue=false; }
+	return(false);
+	}
+}
+
+function setShowAssembler()
+{
+var showAssem=(document.querySelector('#showAssemID').checked);
+if (showAssem)
+	{
+	document.getElementById("assemblerID").style="display:inline-block";
+	}
+else
+	{
+	document.getElementById("assemblerID").style="display:none";
+	}
+}
+
+function saveAssem()
+{
+var name=document.getElementById("saveNameID").value;
+if (name!=="") { sourceName=name; }
+blob=new Blob([assem.value],{ type:'text/plain'});
+const blobUrl=window.URL.createObjectURL(blob);
+var link=window.document.createElement("a");
+link.href=blobUrl;
+link.download=sourceName;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+// despite what someone said, don't revoke
+//window.URL.revokeObjectURL(blobUrl);
+}
+
+function saveBin()
+{
+var name=document.getElementById("saveExportNameID").value;
+if (name!=="") { binName=name; }
+var machinecode="v2.0 raw\n";
+for (i=0;i<addr;i++)
+	{
+	var opcode=(RAM[i]&0x000000ff).toString(16);
+	opcode="0".repeat((n=2-opcode.length)>0?n:0)+opcode;
+	machinecode+=(RAM[i]>>>8).toString(16)+opcode+" ";
+	if (((i+1)%8)==0) { machinecode+="\n"; }
+	}
+blob=new Blob([machinecode],{ type:'text/plain'});
+const blobUrl=window.URL.createObjectURL(blob);
+var link=window.document.createElement("a");
+link.href=blobUrl;
+link.download=binName;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+// despite what someone said, don't revoke
+//window.URL.revokeObjectURL(blobUrl);
+}
+
+function clearAssem()
+{
+assem.value="";
+}
+
+function INST1(x)
+{
+var str=getStr();
+var val=lookupVal(str);
+RAM[addr]=(val<<8)|x;
+if ((out2)&&(pass===2))
+	{ 
+	var opcode=(RAM[addr]&0x000000ff).toString(16);
+	opcode="0".repeat((n=2-opcode.length)>0?n:0)+opcode;
+	acon.value+="** "+(RAM[addr]>>>8).toString(16)+opcode+"\n";
+	}
+addr++;
+}
+
+function INST2(x)
+{
+RAM[addr]=x;
+if ((out2)&&(pass===2))
+	{ 
+	var opcode=(RAM[addr]&0x000000ff).toString(16);
+	opcode="0".repeat((n=2-opcode.length)>0?n:0)+opcode;
+	acon.value+="** "+(RAM[addr]>>>8).toString(16)+opcode+"\n";
+	}
+addr++;
+}
+
+function isAlpha(c)
+{
+return(((c>='a')&&(c<='z'))||((c>='A')&&(c<='Z')));
+}
+
+function lookupVal(str)
+{
+var val,valf;
+var c=str.charAt(0);
+if (isAlpha(c))
+	{
+	var l=equs[str];
+	if (typeof(l)!=='undefined') { val=l; return(val); }
+	var l=labels[str];
+	if (typeof(l)!=='undefined') { val=l; return(val); }
+	if (pass===2) { acon.value+=" **** ERROR: "+str+" not found\n"; return(-1); }
+	return(-1);
+	}
+else if (c==='\'') { val=str.charCodeAt(1); }
+else if (c==='$') { val=parseInt(str.substring(1),16); }
+else if (c==='~') { valf=parseFloat(str.substring(1)); val=FloatToIEEE(valf); }
+else if (c==='%') { val=parseInt(str.substring(1),2); }
+else { val=parseInt(str); }
+return(val);
+}
+
+function printLabels()
+{
+acon.value+="Labels:\n";
+var keys=Object.keys(labels);
+for (i=0;i<keys.length;i++) { acon.value+="  "+(keys[i]+" "+labels[keys[i]].toString(16)+" ("+labels[keys[i]].toString()+")\n"); }
+}
+
+function runAssem()
+{
+resetCPU();
+acon.value="";
+equs={};
+labels={};
+astr=assem.value;
+//console.log(astr);
+len=astr.length;
+//console.log(len);
+// Two passes to get addresses of labels that are used before they are defined
+addr=0; pos=0; pass=1;
+while (parse()) { }
+addr=0; pos=0; pass=2;
+while (parse()) { }
+if (verba>=1) { acon.value+="\nAddress space: "+addr+"\n"; printLabels(); }
+if (verba===3)
+	{
+	acon.value+='\nMachine Code ("v2.0 raw" if Logisim compatibility desired):\n\n';
+	acon.value+="v2.0 raw\n";
+	for (i=0;i<addr;i++)
+		{
+		var opcode=(RAM[i]&0x000000ff).toString(16);
+		opcode="0".repeat((n=2-opcode.length)>0?n:0)+opcode;
+		acon.value+=(RAM[i]>>>8).toString(16)+opcode+" ";
+		}
+	}
+RAM[addr]=12; addr++; // Automatically add a HALT in case user didn't
+loaded=true;
+r=addr;
+}
+
+function outputTTY(v,aReg)
+{
+if (aReg) { RAM[addr]=(v<<8)|0x16; RAM[addr+1]=0x8000001f; }
+else { RAM[addr]=(v<<8); RAM[addr+1]=0x80000002; }
+}
+
+function scanStringForEither(str1,str2)
+{
+var var1;
+
+while (1)
+	{
+	var1=getStr();
+	if (var1===str1) return(0);
+	else if (var1===str2) return(1);
+	else if (pos>=len) return(-1);
+	else if (var1.charAt(0)==='#') { while (((astr.charAt(pos))!=='\n')&&(pos<len)) { pos++; } }
+	}
+}
+
+function scanNested(str1,str2)
+{
+var c,i=1;
+
+while (i>0)
+	{
+	c=scanStringForEither(str1,str2);
+	if (c===0) i--;
+	else if (c===1) i++;
+	else break;
+	}
+}
+
+function getStr()
+{
+while (((astr.charAt(pos)===" ")||(astr.charAt(pos)==="\n")||(astr.charAt(pos)==='\t'))&&(pos<len)) { pos++; }
+var ns=pos;
+while ((astr.charAt(pos)!==' ')&&(astr.charAt(pos)!=='\n')&&(astr.charAt(pos)!=='\t')&&(pos<len)) { pos++; }
+var str=astr.substring(ns,pos);
+//if (astr.charCodeAt(pos)===32) { pos++; }
+//if (astr.charCodeAt(pos)===13) { pos++; }
+//if (astr.charCodeAt(pos)===10) { pos++; }
+return(str);
+}
+
+function parse()
+{
+var val,i,nl,eos,inline0,areg;
+var str;
+
+str=getStr();
+//console.log("parse: "+str);
+if ((verba>=2)&&(pass===2)) { acon.value+="> "+str+"\n"; }
+if (str.charAt(0)==='#') { while (((astr.charAt(pos))!=='\n')&&(pos<len)) { pos++; } }
+var strU=str.toUpperCase();
+if (strU==="EQU")
+	{
+	var name=getStr();
+	var value=lookupVal(getStr());
+	equs[name]=value;
+	}
+else if (strU===":")
+	{
+	var name=getStr();
+	labels[name]=addr;
+	if ((verba>=2)&&(pass===2)) { acon.value+="Label: '"+name+"' "+addr+"\n"; }
+	}
+else if (strU==="LOADI") { INST1(0); }
+else if (strU==="LOAD") { INST1(1); }
+else if (strU==="STOREI") { INST1(2); }
+else if (strU==="STORE") { INST1(3); if ((out)&&(pass===2)) { acon.value+=" **** WARNING: Instruction 'STORE' doesn't work\n"; } }
+else if (strU==="ADDI") { INST1(4); }
+else if (strU==="ADD") { INST1(5); }
+else if (strU==="SUBI") { INST1(6); }
+else if (strU==="SUB") { INST1(7); }
+else if (strU==="JUMP") { INST1(8); }
+else if (strU==="JUMPI") { INST1(9); }
+else if (strU==="JUMPII") { INST1(10); if ((out)&&(pass===2)) { acon.value+=" **** WARNING: Instruction 'JUMPII' doesn't work\n"; } }
+else if (strU==="DATAIN") { INST2(11); }
+else if (strU==="HALT") { INST2(12); }
+else if (strU==="SKIPNEG") { INST2(13); }
+else if (strU==="STROBE") { INST2(14); }
+else if (strU==="NOOP") { INST2(15); }
+else if (strU==="MULI") { INST1(16); }
+else if (strU==="MUL") { INST1(17); }
+else if (strU==="DIVI") { INST1(18); }
+else if (strU==="DIV") { INST1(19); }
+else if (strU==="MODI") { INST1(20); }
+else if (strU==="MOD") { INST1(21); }
+else if (strU==="LOADAI") { INST1(22); }
+else if (strU==="LOADA") { INST1(23); }
+else if (strU==="JUMPEQI") { INST1(24); }
+else if (strU==="JUMPGTI") { INST1(25); }
+else if (strU==="JUMPLTI") { INST1(26); }
+else if (strU==="JUMPNEQI") { INST1(27); }
+else if (strU==="JUMPGTEI") { INST1(28); }
+else if (strU==="JUMPLTEI") { INST1(29); }
+else if (strU==="NEGY") { INST2(30); }
+else if (strU==="STOREAI") { INST1(31); }
+else if (strU==="LOADAIND") { INST2(32); }
+else if (strU==="ANDI") { INST1(33); }
+else if (strU==="AND") { INST1(34); }
+else if (strU==="ORI") { INST1(35); }
+else if (strU==="OR") { INST1(36); }
+else if (strU==="NOT") { INST2(37); }
+else if (strU==="XORI") { INST1(38); }
+else if (strU==="XOR") { INST1(39); }
+else if (strU==="JUMPEQ") { INST1(40); }
+else if (strU==="JUMPGT") { INST1(41); }
+else if (strU==="JUMPLT") { INST1(42); }
+else if (strU==="JUMPNEQ") { INST1(43); }
+else if (strU==="JUMPGTE") { INST1(44); }
+else if (strU==="JUMPLTE") { INST1(45); }
+else if (strU==="STOREAIND") { INST2(46); }
+else if (strU==="FADDA") { INST2(47); }
+else if (strU==="FADD") { INST1(48); }
+else if (strU==="FSUBA") { INST2(49); }
+else if (strU==="FSUB") { INST1(50); }
+else if (strU==="FMULA") { INST2(51); }
+else if (strU==="FMUL") { INST1(52); }
+else if (strU==="FDIVA") { INST2(53); }
+else if (strU==="FDIV") { INST1(54); }
+else if (strU==="FMODA") { INST2(55); }
+else if (strU==="FMOD") { INST1(56); }
+else if (strU==="FNEGY") { INST2(57); }
+else if (strU==="FSQRTY") { INST2(58); }
+else if (strU==="FSQRT") { INST1(59); }
+else if (strU==="FSINY") { INST2(60); }
+else if (strU==="FSIN") { INST1(61); }
+else if (strU==="FCOSY") { INST2(62); }
+else if (strU==="FCOS") { INST1(63); }
+else if (strU==="FTANY") { INST2(64); }
+else if (strU==="FTAN") { INST1(65); }
+else if (strU==="FASINY") { INST2(66); }
+else if (strU==="FASIN") { INST1(67); }
+else if (strU==="FACOSY") { INST2(68); }
+else if (strU==="FACOS") { INST1(69); }
+else if (strU==="FATANY") { INST2(70); }
+else if (strU==="FATAN") { INST1(71); }
+else if (strU==="FATAN2A") { INST2(72); }
+else if (strU==="FATAN2") { INST1(73); }
+else if (strU==="FPOWA") { INST2(74); }
+else if (strU==="FPOW") { INST1(75); }
+else if (strU==="FLNY") { INST2(76); }
+else if (strU==="FLN") { INST1(77); }
+else if (strU==="FLOGY") { INST2(78); }
+else if (strU==="FLOG") { INST1(79); }
+else if (strU==="FABSY") { INST2(80); }
+else if (strU==="FABS") { INST1(81); }
+else if (strU==="FEXPY") { INST2(82); }
+else if (strU==="FEXP") { INST1(83); }
+else if (strU==="FPTOINTY") { INST2(84); }
+else if (strU==="FPTOINT") { INST1(85); }
+else if (strU==="INTTOFPY") { INST2(86); }
+else if (strU==="INTTOFP") { INST1(87); }
+else if (strU==="FJUMPEQI") { INST1(88); }
+else if (strU==="FJUMPGTI") { INST1(89); }
+else if (strU==="FJUMPLTI") { INST1(90); }
+else if (strU==="FJUMPNEQI") { INST1(91); }
+else if (strU==="FJUMPGTEI") { INST1(92); }
+else if (strU==="FJUMPLTEI") { INST1(93); }
+else if (strU==="FJUMPEQ") { INST1(94); }
+else if (strU==="FJUMPGT") { INST1(95); }
+else if (strU==="FJUMPLT") { INST1(96); }
+else if (strU==="FJUMPNEQ") { INST1(97); }
+else if (strU==="FJUMPGTE") { INST1(98); }
+else if (strU==="FJUMPLTE") { INST1(99); }
+else if (strU==="CALL") { INST1(100); }
+else if (strU==="RETURN") { INST2(101); }
+else if (strU==="PUSH") { INST2(102); }
+else if (strU==="POP") { INST2(103); }
+else if (strU==="SREAD") { INST1(104); }
+else if (strU==="FASTINTR") { INST2(253); }
+else if (strU==="BREAKPOINTS") { INST1(254); }
+else if (strU==="BREAKPOINT") { INST1(255); }
+else if (strU==="\*\/") { if (pass===2) { acon.value+=" **** ERROR: \*\/ without \/\*\n"; } }
+else if (strU.substring(0,2)==="\/\*") { scanNested("\*\/","\/\*"); }
+else if (strU==="DC")
+	{
+	str=getStr();
+	var j,dcarr=str.split(",");
+	for (i=0;i<dcarr.length;i++)
+		{
+		var f=dcarr[i].charAt(0);
+		if (f==='$') { RAM[addr]=parseInt(dcarr[i].substring(1),16); addr++; }
+		else if (f==='\'') { for (j=1;j<dcarr[i].length-1;j++) { RAM[addr]=dcarr[i].charCodeAt(j); addr++; } }
+		else { RAM[addr]=lookupVal(dcarr[i]); addr++; }
+		}
+	}
+else if (strU.substring(0,3)==="DCS")
+	{
+	var nl=eos=inline0=areg=0;
+	for (i=3;i<strU.length;i++)
+		{
+		var f=strU.charAt(i);
+		if (f==='N') { nl=1; }
+		else if (f==='0') { eos=1; }
+		else if (f==='I') { inline0=1; }
+		else if (f==='A') { areg=1; }
+		else if (pass===2) { acon.value+=" **** ERROR: Unknown Instr.: "+str+"\n"; }
+		}
+	pos++;
+	var p=pos;
+	while ((astr.charAt(pos)!=='\n')&&(pos<len)) { pos++; }
+	str=astr.substring(p,pos);
+	if (inline0)
+		{
+		for (i=0;i<str.length;i++) { outputTTY(str.charCodeAt(i),areg); addr+=2; }
+		if (nl) { if (dnl) { outputTTY(13,areg); addr+=2; } else { outputTTY(10,areg); addr+=2; } }
+		}
+	else
+		{
+		for (i=0;i<str.length;i++) { RAM[addr]=str.charCodeAt(i); addr++; }
+		if (nl)
+			{
+			if (dnl) { RAM[addr]=13; addr++; } else { RAM[addr+1]=10; addr++; }
+			} // 13 or 10 works
+		if (eos) { RAM[addr]=0; addr++; }
+		}
+	}
+else if (strU==="DS")
+	{
+	str=getStr();
+	val=lookupVal(str);
+	for (i=0;i<val;i++) { RAM[i+addr]=0; } addr+=val;
+	}
+else if (strU==="OUTPUT") { out2=parseInt(getStr()); }
+else if ((strU.charAt(0)!=='#')&&(strU!=="")&&(pass===2)) { acon.value+=" **** ERROR: Unknown Instr.: "+str+"\n"; }
+if (pos>=len) { return(0); }
+return(1);
+}
+
+document.getElementById("assemFileID").onchange=function(event)
+	{
+	if (!window.FileReader) { return; } // Browser is not compatible
+	var reader=new FileReader();
+	reader.onload=function(event)
+		{
+		if (event.target.readyState!=2) { return; }
+		if (event.target.error) { alert('Error while reading file'); return; }
+		assem.value=event.target.result;
+		};
+	reader.readAsText(event.target.files[0]);
+	};
+</script>
+</body>
+</html>
