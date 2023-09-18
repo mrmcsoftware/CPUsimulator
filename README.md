@@ -36,7 +36,10 @@ the provided **`assem.html`**, but you would lose the automatic loading of the
 program into the simulator.
 
 For a live demo, go to **https://mrmcsoftware.github.io/CPUsimulator** but do
-try to use your own copy instead.
+try to use your own copy instead.  Since the file loading function will only
+upload files from your computer (not a github repo), for the Live Demo, I've
+added the **Examples:** drop-down selection button (top-right).  You can select
+the example program you want to run, then click **Start**.
 
 >Note: Ignore **`index.html`** .  It is only there to make Github Pages work.
 
