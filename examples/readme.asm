@@ -1,0 +1,143 @@
+/* This program doesn't do anything, it just is a test to make sure the
+   examples in README.md are correct. */
+
+EQU val $1000
+EQU pixel $1001
+EQU Offset $1002
+EQU CalcOff $1003
+EQU num $1004
+EQU t2 $1005
+EQU X0 $1006
+
+BREAKPOINTS Message
+HALT
+: Message DCS0 Trace start
+
+BREAKPOINT aedge2
+BREAKPOINT $ffffff /* output Y */
+BREAKPOINT $fffffe /* output A */
+
+EQU Menu1 49 EQU Color1 $14ff14 EQU val1 ~12.75 EQU val2 %11101
+: Loop STROBE NOOP JUMP Loop
+/* This is a comment */ STROBE /* Another comment */
+STROBE # This is a comment
+: Xstart DC ~3.28125
+: Values DC 'This_is_a_test','#',1234,%1101,val1,~1.26
+DC 123
+DCSI Enter n:
+DCSNIA This is a test
+DCSNI Hello World
+DCS0 Testing 123
+DS 1 DS 256 DS val2
+OUTPUT 1 STROBE NOOP OUTPUT 0
+: Menu
+LOADI 128
+LOAD Xmin
+STOREI X0
+ADDI 1
+ADD pixel
+: print
+SUBI 1
+SUB Offset
+JUMP Menu
+JUMPI CalcOff
+DATAIN
+HALT
+SKIPNEG
+STROBE
+NOOP
+MULI 10
+MUL val
+DIVI 10
+DIV val
+MODI 6
+MOD num
+LOADAI 256
+LOADA val
+JUMPEQI done
+JUMPGTI done
+JUMPLTI done
+JUMPNEQI done
+JUMPGTEI done
+JUMPLTEI done
+NEGY
+STOREAI t2
+LOADAIND
+ANDI 128
+AND val
+ORI 128
+OR val
+NOT
+XORI 128
+XOR val
+JUMPEQ val
+JUMPGT val
+JUMPLT val
+JUMPNEQ val
+JUMPGTE val
+JUMPLTE val
+STOREAIND
+FADDA
+FADD val
+FSUBA
+FSUB val
+FMULA
+FMUL val
+FDIVA
+FDIV val
+FMODA
+FMOD val
+FNEGY
+FSQRTY
+FSQRT val
+FSINY
+FSIN val
+FCOSY
+FCOS val
+FTANY
+FTAN val
+FASINY
+FASIN val
+FACOSY
+FACOS val
+FATANY
+FATAN val
+FATAN2A
+FATAN2 val
+FPOWA
+FPOW val
+FLNY
+FLN val
+FLOGY
+FLOG val
+FABSY
+FABS val
+FEXPY
+FEXP val
+FPTOINTY
+FPTOINT val
+INTTOFPY
+INTTOFP val
+FJUMPEQI done
+FJUMPGTI done
+FJUMPLTI done
+FJUMPNEQI done
+FJUMPGTEI done
+FJUMPLTEI done
+FJUMPEQ val
+FJUMPGT val
+FJUMPLT val
+FJUMPNEQ val
+FJUMPGTE val
+FJUMPLTE val
+CALL print
+RETURN
+PUSH
+POP
+: done
+SREAD 4
+FASTINTR
+
+: aedge2 DC ~1.5
+: Xmin DC -3
+
