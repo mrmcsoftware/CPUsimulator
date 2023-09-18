@@ -1464,6 +1464,7 @@ switch (prog)
 "65 66 67 468 fd 3fc00000 fffffffd "; break;
 	}
 if (prog===0) { return; }
+resetCPU();
 processBin(str);
 loaded=true;
 started=0;
