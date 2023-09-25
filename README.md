@@ -164,11 +164,12 @@ the Fast Mode checkbox and the TTY screen back and forth, you can press
 **`Ctrl-Shift`** in the TTY screen (while the TTY screen has focus) to turn on
 Fast Mode - that way the TTY screen won't lose focus.  If the **left**
 **`Ctrl-Shift`** combination doesn't work for you, try the **right**
-**`Ctrl-Shift`**.  Another caveat: if your program takes too long to either
-reach HALT or DATAIN, I suspect the browser's "safety feature" allowing you to
-stop the script will kick in, except the browser will perhaps be too busy to
-put the dialog up, thus creating a worse situation than it was supposed to
-solve.  This is just a guess though.
+**`Ctrl-Shift`**, **OR** hold the **`Ctrl`** key down while pressing **`Shift`**
+twice (probably a "browser thing").  Another caveat: if your program takes too
+long to either reach HALT or DATAIN, I suspect the browser's "safety feature"
+allowing you to stop the script will kick in, except the browser will perhaps
+be too busy to put the dialog up, thus creating a worse situation than it was
+supposed to solve.  This is just a guess though.
 
 There is a partial solution to this problem.  **`FASTINTR`** will interrupt the
 continuous run loop temporarily allowing the browser to do whatever function
