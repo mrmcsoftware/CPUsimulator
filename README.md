@@ -59,7 +59,7 @@ you probably will need to escape the special characters, depending on your OS
   - **midimode=off** - The assembly program will be providing frequencies rather than midi note numbers
   - **verbose=on** - Provide some extra simulation information in the browser's console
   - **wordwrap=off** - Don't use word wrap on TTY screen
-  - **image={number}** - Select which fancy "CPU Simulator" image to use (**0**, **1**, **2**, **3**, or **-1** (-1 for no image))
+  - **image={number}** - Select which fancy "CPU Simulator" image to use (**0**, **1**, **2**, **3**, **4**, or **-1** (-1 for no image))
 
 ## Using The Simulator
 
